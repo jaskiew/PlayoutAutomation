@@ -31,8 +31,11 @@
             <ComboBox ItemsSource="{Binding SupportedLanguages}" DisplayMemberPath="DisplayName" SelectedValuePath="Name" SelectedValue="{Binding UiLanguage}" />
             <Separator Margin="10"/>
             <Label Content="Database" FontWeight="Bold" HorizontalAlignment="Center"/>
-            <Label Content="Connection string"/>
-            <DockPanel>
+			<Label Content="Database Provider"/>
+			<ComboBox ItemsSource="{Binding DatabaseProviders}" SelectedItem="{Binding DatabaseProvider}"/>
+
+			<DockPanel Visibility="{Binding IsMySql, Converter={StaticResource BoolToVis}}">
+				<Label Content="Connection string"/>
                 <Button DockPanel.Dock="Right" MaxHeight="31" VerticalAlignment="Top" Height="{Binding ElementName=edConnectionString, Path=ActualHeight}" Command="{Binding CommandEditConnectionString}" ToolTip="Edit...">
                     <Image Source="/TAS.Client.Common;component/Images/Actions/edit.png"/>
                 </Button>

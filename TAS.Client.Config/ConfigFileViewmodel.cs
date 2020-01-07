@@ -22,6 +22,8 @@ namespace TAS.Client.Config
         private bool _isConnectionStringSecondary;
         private string _uiLanguage;
         private double _referenceLoudnessLevel;
+        private string _databaseProvider;
+        private bool _isMySql;
         private readonly IDatabase _db;
 
         protected override void OnDispose() { }
@@ -38,6 +40,7 @@ namespace TAS.Client.Config
             Load(Model.AppSettings);
             Load(Model.ConnectionStrings);
             _isConnectionStringSecondary = !string.IsNullOrWhiteSpace(tasConnectionStringSecondary);
+            _isMySql = (_databaseProvider == "MySql");
         }
 
         public string IngestFolders
@@ -88,12 +91,25 @@ namespace TAS.Client.Config
             set => SetField(ref _isConnectionStringSecondary, value);
         }
 
+        public bool IsMySql
+        {
+            get => _isMySql;
+            set => SetField(ref _isMySql, value);
+        }
+
         public string UiLanguage
         {
             get => _uiLanguage;
             set => SetField(ref _uiLanguage, value);
         }
 
+        public string DatabaseProvider
+        {
+            get => _databaseProvider;
+            set => SetField(ref _databaseProvider, value);
+        }
+
+        public IEnumerable<string> DatabaseProviders { get; } = new List<string> { "MySql", "SQLite" };
         public string ExeDirectory => Path.GetDirectoryName(Model.FileName);
 
 
