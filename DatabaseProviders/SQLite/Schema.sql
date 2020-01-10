@@ -54,11 +54,10 @@ CREATE INDEX asrunlog_idEngine ON asrunlog (idEngine);
 
 CREATE TABLE customcommand (
   idCustomCommand INTEGER PRIMARY KEY,
-  idCustomCommand BIGINT,
   idEngine BIGINT,
   CommandName TEXT,
   CommandIn TEXT,
-  CommandOut TEXT,
+  CommandOut TEXT 
 );
 
 CREATE TABLE engine (
@@ -209,4 +208,5 @@ CREATE INDEX engine_acl_idEngine ON engine_acl (idEngine);
 CREATE INDEX engine_acl_idACO ON engine_acl (idACO);
 
 
-INSERT INTO params (Section, Key, Value) VALUES ('DATABASE', 'VERSION', '12');
+INSERT INTO params (Section, Key, Value) VALUES ('DATABASE', 'VERSION', '1');
+COMMIT
