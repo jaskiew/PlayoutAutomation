@@ -70,6 +70,10 @@
       <Project>{9ACA6AE7-49ED-4599-91AC-927680CF9623}</Project>
       <Name>TAS.Common</Name>
     </ProjectReference>
+    <ProjectReference Include="..\MySqlRedundant\TAS.Database.MySqlRedundant.csproj">
+      <Project>{4703CD4F-FA9B-4E2D-91A1-19BC1A73230D}</Project>
+      <Name>TAS.Database.MySqlRedundant</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
