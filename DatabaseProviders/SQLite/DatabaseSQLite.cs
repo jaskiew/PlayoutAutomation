@@ -16,7 +16,6 @@ using TAS.Common.Database.Interfaces.Media;
 using TAS.Common.Interfaces;
 using TAS.Common.Interfaces.MediaDirectory;
 using TAS.Common.Interfaces.Security;
-using TAS.Database.MySqlRedundant;
 
 namespace TAS.Database.SQLite
 {
@@ -29,15 +28,15 @@ namespace TAS.Database.SQLite
 
         public ConnectionStateRedundant ConnectionState => (ConnectionStateRedundant)_connection.State;
 
-        public IDictionary<string, int> ServerMediaFieldLengths { get; private set; }
+        public IDictionary<string, int> ServerMediaFieldLengths { get; } = new Dictionary<string, int>();
 
-        public IDictionary<string, int> ArchiveMediaFieldLengths { get; private set; }
+        public IDictionary<string, int> ArchiveMediaFieldLengths { get; } = new Dictionary<string, int>();
 
-        public IDictionary<string, int> EventFieldLengths { get; private set; }
+        public IDictionary<string, int> EventFieldLengths { get; } = new Dictionary<string, int>();
 
         public IDictionary<string, int> SecurityObjectFieldLengths { get; } = new Dictionary<string, int>();
 
-        public IDictionary<string, int> MediaSegmentFieldLengths { get; private set; }
+        public IDictionary<string, int> MediaSegmentFieldLengths { get; } = new Dictionary<string, int>();
 
         public IDictionary<string, int> EngineFieldLengths { get; } = new Dictionary<string, int>();
 
@@ -151,7 +150,7 @@ VALUES
 @Flags
 );", _connection);
                     cmd.Parameters.AddWithValue("@idEngine", idEngine);
-                    cmd.Parameters.AddWithValue("@ExecuteTime", e.StartTime);
+                    cmd.Parameters.AddWithValue("@ExecuteTime", e.StartTime.Ticks);
                     var media = e.Media;
                     if (media != null)
                     {
@@ -170,8 +169,8 @@ VALUES
                         cmd.Parameters.AddWithValue("@typVideo", DBNull.Value);
                         cmd.Parameters.AddWithValue("@typAudio", DBNull.Value);
                     }
-                    cmd.Parameters.AddWithValue("@StartTC", e.StartTc);
-                    cmd.Parameters.AddWithValue("@Duration", e.Duration);
+                    cmd.Parameters.AddWithValue("@StartTC", e.StartTc.Ticks);
+                    cmd.Parameters.AddWithValue("@Duration", e.Duration.Ticks);
                     cmd.Parameters.AddWithValue("@idProgramme", e.IdProgramme);
                     cmd.Parameters.AddWithValue("@idAuxRundown", e.IdAux);
                     cmd.Parameters.AddWithValue("@SecEvents", string.Join(";", e.SubEvents.Select(se => se.EventName)));
@@ -424,7 +423,7 @@ VALUES
             dataReader.Close();
             var media = new T
             {
-                IdPersistentMedia = dataReader.GetInt64("idArchiveMedia")
+                IdPersistentMedia = dataReader.GetUInt64("idArchiveMedia")
             };
             _mediaReadFields(media, dataReader);
             return media;
@@ -432,7 +431,7 @@ VALUES
 
         private void _mediaReadFields(IPersistentMedia media, SQLiteDataReader dataReader)
         {
-            var flags = dataReader.IsDBNull("flags") ? 0 : dataReader.GetUInt32("flags");
+            var flags = dataReader.IsDBNull("flags") ? 0 : dataReader.GetInt32("flags");
             media.MediaName = dataReader.IsDBNull("MediaName") ? string.Empty : dataReader.GetString("MediaName");
             media.LastUpdated = dataReader.GetDateTime("LastUpdated");
             media.MediaGuid = dataReader.GetGuid("MediaGuid");
@@ -483,33 +482,7 @@ VALUES
 
         public void InitializeFieldLengths()
         {
-            ServerMediaFieldLengths = new Dictionary<string, int>
-            {
-                { nameof(IServerMedia.MediaName), _tablesStringFieldsLenghts["servermedia"]["MediaName"] },
-                { nameof(IServerMedia.FileName), _tablesStringFieldsLenghts["servermedia"]["FileName"] },
-                { nameof(IServerMedia.Folder), _tablesStringFieldsLenghts["servermedia"]["Folder"] },
-                { nameof(IServerMedia.IdAux), _tablesStringFieldsLenghts["servermedia"]["idAux"] }
-            };
-
-            ArchiveMediaFieldLengths = new Dictionary<string, int>
-            {
-                { nameof(IArchiveMedia.MediaName), _tablesStringFieldsLenghts["archivemedia"]["MediaName"] },
-                { nameof(IArchiveMedia.FileName), _tablesStringFieldsLenghts["archivemedia"]["FileName"] },
-                { nameof(IArchiveMedia.Folder), _tablesStringFieldsLenghts["archivemedia"]["Folder"] },
-                { nameof(IArchiveMedia.IdAux), _tablesStringFieldsLenghts["archivemedia"]["idAux"] }
-            };
-
-            EventFieldLengths = new Dictionary<string, int>
-            {
-                { nameof(IEvent.EventName), _tablesStringFieldsLenghts["rundownevent"]["EventName"] },
-                { nameof(IEvent.IdAux), _tablesStringFieldsLenghts["rundownevent"]["idAux"] },
-                { nameof(ICommandScript.Command), _tablesStringFieldsLenghts["rundownevent"]["Commands"] }
-            };
-
-            MediaSegmentFieldLengths = new Dictionary<string, int>
-            {
-                { nameof(IMediaSegment.SegmentName), _tablesStringFieldsLenghts["mediasegments"]["SegmentName"] },
-            };
+            
         }
 
         public void InsertArchiveDirectory(IArchiveDirectoryProperties dir)
@@ -520,19 +493,56 @@ VALUES
                     var cmd = new SQLiteCommand(@"INSERT INTO archive set Folder=@Folder", _connection);
                     cmd.Parameters.AddWithValue("@Folder", dir.Folder);
                     cmd.ExecuteNonQuery();
-                    dir.IdArchive = (ulong)cmd.LastInsertedId;
+                    dir.IdArchive = (ulong)_connection.LastInsertRowId;
                 }
             }
         }
 
         public void InsertEngine(IEnginePersistent engine)
         {
-            throw new NotImplementedException();
+            lock (_connection)
+            {
+                {                   
+                    var cmd = new SQLiteCommand(@"INSERT INTO engine (Instance, idServerPRI, ServerChannelPRI, idServerSEC, ServerChannelSEC, idServerPRV, ServerChannelPRV, idArchive, Config) VALUES(@Instance, @idServerPRI, @ServerChannelPRI, @idServerSEC, @ServerChannelSEC, @idServerPRV, @ServerChannelPRV, @idArchive, @Config);", _connection);
+                    cmd.Parameters.AddWithValue("@Instance", engine.Instance);
+                    cmd.Parameters.AddWithValue("@idServerPRI", engine.IdServerPRI);
+                    cmd.Parameters.AddWithValue("@ServerChannelPRI", engine.ServerChannelPRI);
+                    cmd.Parameters.AddWithValue("@idServerSEC", engine.IdServerSEC);
+                    cmd.Parameters.AddWithValue("@ServerChannelSEC", engine.ServerChannelSEC);
+                    cmd.Parameters.AddWithValue("@idServerPRV", engine.IdServerPRV);
+                    cmd.Parameters.AddWithValue("@ServerChannelPRV", engine.ServerChannelPRV);
+                    cmd.Parameters.AddWithValue("@IdArchive", engine.IdArchive);
+                    var serializer = new XmlSerializer(engine.GetType());
+                    using (var writer = new StringWriter())
+                    {
+                        serializer.Serialize(writer, engine);
+                        cmd.Parameters.AddWithValue("@Config", writer.ToString());
+                    }
+                    cmd.ExecuteNonQuery();
+                    engine.Id = (ulong)_connection.LastInsertRowId;
+                }
+            }
         }
 
         public bool InsertEngineAcl<TEventAcl>(TEventAcl acl) where TEventAcl : IAclRight, IPersistent
         {
-            throw new NotImplementedException();
+            if (acl?.Owner == null)
+                return false;
+            lock (_connection)
+            {
+                using (var cmd =
+                    new SQLiteCommand(
+                        "INSERT INTO engine_acl (idEngine, idACO, ACL) VALUES (@idEngine, @idACO, @ACL);",
+                        _connection))
+                {
+                    cmd.Parameters.AddWithValue("@idEngine", acl.Owner.Id);
+                    cmd.Parameters.AddWithValue("@idACO", acl.SecurityObject.Id);
+                    cmd.Parameters.AddWithValue("@ACL", acl.Acl);
+                    if (cmd.ExecuteNonQuery() == 1)
+                        acl.Id = (ulong)_connection.LastInsertRowId;
+                    return true;
+                }
+            }
         }
 
         public bool InsertEvent(IEventPersistent aEvent)
@@ -548,7 +558,7 @@ VALUES
                     using (var cmd = new SQLiteCommand(query, _connection))
                         if (_eventFillParamsAndExecute(cmd, aEvent))
                         {
-                            aEvent.Id = (ulong)cmd.LastInsertedId;
+                            aEvent.Id = (ulong)_connection.LastInsertRowId;
                             Debug.WriteLine("DbInsertEvent Id={0}, EventName={1}", aEvent.Id, aEvent.EventName);
                             if (aEvent is ITemplated eventTemplated)
                                 _eventAnimatedSave(aEvent.Id, eventTemplated, true);
@@ -571,12 +581,12 @@ VALUES
 
             cmd.Parameters.AddWithValue("@ScheduledTime", DBNull.Value);
 
-            cmd.Parameters.AddWithValue("@Duration", aEvent.Duration);
+            cmd.Parameters.AddWithValue("@Duration", aEvent.Duration.Ticks);
             if (aEvent.ScheduledTc.Equals(TimeSpan.Zero))
                 cmd.Parameters.AddWithValue("@ScheduledTC", DBNull.Value);
             else
-                cmd.Parameters.AddWithValue("@ScheduledTC", aEvent.ScheduledTc);
-            cmd.Parameters.AddWithValue("@ScheduledDelay", aEvent.ScheduledDelay);
+                cmd.Parameters.AddWithValue("@ScheduledTC", aEvent.ScheduledTc.Ticks);
+            cmd.Parameters.AddWithValue("@ScheduledDelay", aEvent.ScheduledDelay.Ticks);
             if (aEvent.MediaGuid == Guid.Empty)
                 cmd.Parameters.AddWithValue("@MediaGuid", DBNull.Value);
             else
@@ -587,13 +597,13 @@ VALUES
             if (aEvent.StartTc.Equals(TimeSpan.Zero))
                 cmd.Parameters.AddWithValue("@StartTC", DBNull.Value);
             else
-                cmd.Parameters.AddWithValue("@StartTC", aEvent.StartTc);
+                cmd.Parameters.AddWithValue("@StartTC", aEvent.StartTc.Ticks);
             if (aEvent.RequestedStartTime == null)
                 cmd.Parameters.AddWithValue("@RequestedStartTime", DBNull.Value);
             else
                 cmd.Parameters.AddWithValue("@RequestedStartTime", aEvent.RequestedStartTime);
-            cmd.Parameters.AddWithValue("@TransitionTime", aEvent.TransitionTime);
-            cmd.Parameters.AddWithValue("@TransitionPauseTime", aEvent.TransitionPauseTime);
+            cmd.Parameters.AddWithValue("@TransitionTime", aEvent.TransitionTime.Ticks);
+            cmd.Parameters.AddWithValue("@TransitionPauseTime", aEvent.TransitionPauseTime.Ticks);
             cmd.Parameters.AddWithValue("@typTransition", (ushort)aEvent.TransitionType | ((ushort)aEvent.TransitionEasing) << 8);
             cmd.Parameters.AddWithValue("@idProgramme", aEvent.IdProgramme);
             if (aEvent.AudioVolume == null)
@@ -640,7 +650,7 @@ VALUES
                     cmd.Parameters.AddWithValue("@idACO", acl.SecurityObject.Id);
                     cmd.Parameters.AddWithValue("@ACL", acl.Acl);
                     if (cmd.ExecuteNonQuery() == 1)
-                        acl.Id = (ulong)cmd.LastInsertedId;
+                        acl.Id = (ulong)_connection.LastInsertRowId;
                     return true;
                 }
             }
@@ -678,7 +688,7 @@ VALUES
 VALUES 
 (@idServer, @MediaName, @Folder, @FileName, @FileSize, @LastUpdated, @Duration, @DurationPlay, @idProgramme, @statusMedia, @typMedia, @typAudio, @typVideo, @TCStart, @TCPlay, @AudioVolume, @AudioLevelIntegrated, @AudioLevelPeak, @idAux, @KillDate, @MediaGuid, @flags);", _connection);
             _mediaFillParamsAndExecute(cmd, "servermedia", media, serverId);
-            media.IdPersistentMedia = (ulong)cmd.LastInsertedId;
+            media.IdPersistentMedia = (ulong)_connection.LastInsertRowId;
             Debug.WriteLine(media, "ServerMediaInserte-d");
             return true;
         }
@@ -692,7 +702,7 @@ VALUES
 VALUES 
 (@idArchive, @MediaName, @Folder, @FileName, @FileSize, @LastUpdated, @Duration, @DurationPlay, @idProgramme, @statusMedia, @typMedia, @typAudio, @typVideo, @TCStart, @TCPlay, @AudioVolume, @AudioLevelIntegrated, @AudioLevelPeak, @idAux, @KillDate, @MediaGuid, @flags);", _connection);
                 _mediaFillParamsAndExecute(cmd, "archivemedia", archiveMedia, serverid);
-                archiveMedia.IdPersistentMedia = (ulong)cmd.LastInsertedId;
+                archiveMedia.IdPersistentMedia = (ulong)_connection.LastInsertRowId;
             }
             return true;
         }
@@ -730,7 +740,7 @@ VALUES
             lock (_connection)
             {
                 {
-                    var cmd = new SQLiteCommand(@"insert into aco set typAco=@typAco, Config=@Config;", _connection);
+                    var cmd = new SQLiteCommand(@"insert into aco VALUES (typAco=@typAco, Config=@Config);", _connection);
                     var serializer = new XmlSerializer(pAco.GetType());
                     using (var writer = new StringWriter())
                     {
@@ -739,7 +749,7 @@ VALUES
                     }
                     cmd.Parameters.AddWithValue("@typAco", (int)aco.SecurityObjectTypeType);
                     cmd.ExecuteNonQuery();
-                    pAco.Id = (ulong)cmd.LastInsertedId;
+                    pAco.Id = (ulong)_connection.LastInsertRowId;
                 }
             }
         }
@@ -749,7 +759,7 @@ VALUES
             lock (_connection)
             {
                 {
-                    var cmd = new SQLiteCommand(@"INSERT INTO server set typServer=0, Config=@Config", _connection);
+                    var cmd = new SQLiteCommand(@"INSERT INTO server VALUES(typServer=0, Config=@Config);", _connection);
                     var serializer = new XmlSerializer(server.GetType());
                     using (var writer = new StringWriter())
                     {
@@ -757,7 +767,7 @@ VALUES
                         cmd.Parameters.AddWithValue("@Config", writer.ToString());
                     }
                     cmd.ExecuteNonQuery();
-                    server.Id = (ulong)cmd.LastInsertedId;
+                    server.Id = (ulong)_connection.LastInsertRowId;
                 }
             }
         }
@@ -780,7 +790,7 @@ VALUES
                         var serializer = new XmlSerializer(typeof(T));
                         var user = (T)serializer.Deserialize(reader);
                         if (user is IPersistent pUser)
-                            pUser.Id = dataReader.GetInt64("idACO");
+                            pUser.Id = dataReader.GetUInt64("idACO");
                         users.Add(user);
                     }
                     dataReader.Close();
@@ -806,7 +816,7 @@ VALUES
 
                             var media = new T
                             {
-                                IdPersistentMedia = dataReader.GetInt64("idServerMedia"),
+                                IdPersistentMedia = dataReader.GetUInt64("idServerMedia"),
                             };
                             _mediaReadFields(media, dataReader);
                             directory.AddMedia(media);
@@ -833,7 +843,7 @@ VALUES
                     {
                         var dir = new T
                         {
-                            IdArchive = dataReader.GetInt64("idArchive"),
+                            IdArchive = dataReader.GetUInt64("idArchive"),
                             Folder = dataReader.GetString("Folder")
                         };
                         directories.Add(dir);
@@ -881,15 +891,15 @@ VALUES
                         var reader = new StringReader(dataReader.GetString("Config"));
                         var serializer = new XmlSerializer(typeof(T));
                         var engine = (T)serializer.Deserialize(reader);
-                        engine.Id = dataReader.GetInt64("idEngine");
-                        engine.IdServerPRI = dataReader.GetInt64("idServerPRI");
+                        engine.Id = dataReader.GetUInt64("idEngine");
+                        engine.IdServerPRI = dataReader.GetUInt64("idServerPRI");
                         engine.ServerChannelPRI = dataReader.GetInt32("ServerChannelPRI");
-                        engine.IdServerSEC = dataReader.GetInt64("idServerSEC");
+                        engine.IdServerSEC = dataReader.GetUInt64("idServerSEC");
                         engine.ServerChannelSEC = dataReader.GetInt32("ServerChannelSEC");
-                        engine.IdServerPRV = dataReader.GetInt64("idServerPRV");
+                        engine.IdServerPRV = dataReader.GetUInt64("idServerPRV");
                         engine.ServerChannelPRV = dataReader.GetInt32("ServerChannelPRV");
-                        engine.IdArchive = dataReader.GetInt64("IdArchive");
-                        engine.Instance = dataReader.GetInt64("Instance");
+                        engine.IdArchive = dataReader.GetUInt64("IdArchive");
+                        engine.Instance = dataReader.GetUInt64("Instance");
                         engines.Add(engine);
                     }
                     dataReader.Close();
@@ -916,7 +926,7 @@ VALUES
                         {
                             var media = new T
                             {
-                                IdPersistentMedia = dataReader.GetInt64("idServerMedia")
+                                IdPersistentMedia = dataReader.GetUInt64("idServerMedia")
                             };
                             _mediaReadFields(media, dataReader);
                             directory.AddMedia(media);
@@ -944,7 +954,7 @@ VALUES
                         var reader = new StringReader(dataReader.GetString("Config"));
                         var serializer = new XmlSerializer(typeof(T));
                         var server = (T)serializer.Deserialize(reader);
-                        server.Id = dataReader.GetInt64("idServer");
+                        server.Id = dataReader.GetUInt64("idServer");
                         servers.Add(server);
                     }
                     dataReader.Close();
@@ -958,7 +968,7 @@ VALUES
             var reason = MediaDeleteResult.NoDeny;
             lock (_connection)
             {
-                var cmd = new SQLiteCommand("select * from rundownevent where MediaGuid=@MediaGuid and ADDTIME(ScheduledTime, Duration) > UTC_TIMESTAMP();", _connection);
+                var cmd = new SQLiteCommand("select * from rundownevent where MediaGuid=@MediaGuid and ADDTIME(ScheduledTime, Duration) > datetime('now', 'localtime');", _connection);
                 cmd.Parameters.AddWithValue("@MediaGuid", serverMedia.MediaGuid);
                 IEvent futureScheduled = null;
                 using (var reader = cmd.ExecuteReader())
@@ -977,13 +987,13 @@ VALUES
 
         private IEvent _eventRead(IEngine engine, SQLiteDataReader dataReader)
         {
-            var flags = dataReader.IsDBNull("flagsEvent") ? 0 : dataReader.GetInt32("flagsEvent");
+            var flags = dataReader.IsDBNull("flagsEvent") ? 0 : dataReader.GetUInt32("flagsEvent");
             var transitionType = dataReader.GetInt16("typTransition");
             var eventType = (TEventType)dataReader.GetByte("typEvent");
             var newEvent = engine.CreateNewEvent(
-                dataReader.GetInt64("idRundownEvent"),
-                dataReader.GetInt64("idEventBinding"),
-                (VideoLayer)dataReader.GetSByte("Layer"),
+                dataReader.GetUInt64("idRundownEvent"),
+                dataReader.GetUInt64("idEventBinding"),
+                (VideoLayer)dataReader.GetByte("Layer"),
                 eventType,
                 (TStartType)dataReader.GetByte("typStart"),
                 (TPlayState)dataReader.GetByte("PlayState"),
@@ -1001,7 +1011,7 @@ VALUES
                 (TTransitionType)(transitionType & 0xFF),
                 (TEasing)(transitionType >> 8),
                 dataReader.IsDBNull("AudioVolume") ? null : (double?)dataReader.GetDouble("AudioVolume"),
-                dataReader.GetInt64("idProgramme"),
+                dataReader.GetUInt64("idProgramme"),
                 dataReader.GetString("IdAux"),
                 flags.IsEnabled(),
                 flags.IsHold(),
@@ -1035,21 +1045,62 @@ VALUES
                     animatedEvent.Fields = fieldsDeserialized;
             }
         }
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, WeakReference> _mediaSegments = new System.Collections.Concurrent.ConcurrentDictionary<Guid, WeakReference>();
+        private IMediaSegments _findInDictionary(Guid mediaGuid)
+        {
+            if (!_mediaSegments.TryGetValue(mediaGuid, out var existingRef))
+                return null;
+            if (existingRef.IsAlive)
+                return (IMediaSegments)existingRef.Target;
+            _mediaSegments.TryRemove(mediaGuid, out existingRef);
+            return null;
+        }
+        private ConstructorInfo _mediaSegmentsConstructorInfo;
 
         public T MediaSegmentsRead<T>(IPersistentMedia media) where T : IMediaSegments
         {
-            throw new NotImplementedException();
+            lock (_connection)
+            {
+                if (_mediaSegmentsConstructorInfo == null)
+                    _mediaSegmentsConstructorInfo = typeof(T).GetConstructor(new[] { typeof(Guid) });
+
+                if (_mediaSegmentsConstructorInfo == null)
+                    throw new ApplicationException("No constructor found for IMediaSegments");
+
+                var mediaGuid = media.MediaGuid;
+                var cmd = new SQLiteCommand("SELECT * FROM MediaSegments where MediaGuid = @MediaGuid;", _connection);
+                cmd.Parameters.AddWithValue("@MediaGuid", mediaGuid);
+                var segments = _findInDictionary(mediaGuid);
+                if (segments == null)
+                {
+                    segments = (IMediaSegments)_mediaSegmentsConstructorInfo.Invoke(new object[] { mediaGuid });
+                    _mediaSegments.TryAdd(mediaGuid, new WeakReference(segments));
+                }
+                using (var dataReader = cmd.ExecuteReader())
+                {
+                    while (dataReader.Read())
+                    {
+                        var newSegment = segments.Add(
+                            dataReader.IsDBNull("TCIn") ? default(TimeSpan) : dataReader.GetTimeSpan("TCIn"),
+                            dataReader.IsDBNull("TCOut") ? default(TimeSpan) : dataReader.GetTimeSpan("TCOut"),
+                            dataReader.IsDBNull("SegmentName") ? string.Empty : dataReader.GetString("SegmentName")
+                            );
+                        newSegment.Id = dataReader.GetUInt64("idMediaSegment");
+                    }
+                    dataReader.Close();
+                }
+                return (T)segments;
+            }
         }
 
         public void Open(string connectionStringPrimary = null, string connectionStringSecondary = null)
         {
-            if (connectionStringPrimary != null)
-            {
-                ConnectionStringPrimary = connectionStringPrimary;
-                ConnectionStringSecondary = connectionStringSecondary;
-            }
+            ConnectionStringPrimary = connectionStringPrimary;
+#if DEBUG
+            ConnectionStringPrimary = @"Data Source=C:\Users\Emisja\Downloads\blop.db; Version=3; FailIfMissing=False; Foreign Keys=True;";
+#endif
+
             _connection = new SQLiteConnection(ConnectionStringPrimary);
-            _connection.StateChange += _connection_StateRedundantChange;
             _connection.Open();
         }
 
@@ -1068,10 +1119,10 @@ VALUES
                     {
                         var item = new TEngineAcl
                         {
-                            Id = dataReader.GetInt64("idEngine_ACL"),
+                            Id = dataReader.GetUInt64("idEngine_ACL"),
                             Owner = engine,
-                            SecurityObject = authenticationService.FindSecurityObject(dataReader.GetInt64("idACO")),
-                            Acl = dataReader.GetInt64("ACL")
+                            SecurityObject = authenticationService.FindSecurityObject(dataReader.GetUInt64("idACO")),
+                            Acl = dataReader.GetUInt64("ACL")
                         };
                         acl.Add(item);
                     }
@@ -1117,10 +1168,10 @@ VALUES
                     {
                         var item = new TEventAcl
                         {
-                            Id = dataReader.GetInt64("idRundownevent_ACL"),
+                            Id = dataReader.GetUInt64("idRundownevent_ACL"),
                             Owner = aEvent,
-                            SecurityObject = authenticationService.FindSecurityObject(dataReader.GetInt64("idACO")),
-                            Acl = dataReader.GetInt64("ACL")
+                            SecurityObject = authenticationService.FindSecurityObject(dataReader.GetUInt64("idACO")),
+                            Acl = dataReader.GetUInt64("ACL")
                         };
                         acl.Add(item);
                     }
@@ -1228,7 +1279,7 @@ VALUES
                 command.Parameters.AddWithValue("@TCOut", mediaSegment.TcOut);
                 command.Parameters.AddWithValue("@SegmentName", mediaSegment.SegmentName);
                 command.ExecuteNonQuery();
-                return (ulong)command.LastInsertedId;
+                return (ulong)_connection.LastInsertRowId;
             }
         }
 
@@ -1245,7 +1296,7 @@ VALUES
                     {
                         while (dataReader.Read())
                         {
-                            if (engine.GetRootEvents().Any(e => (e as IEventPersistent)?.Id == dataReader.GetInt64("idRundownEvent")))
+                            if (engine.GetRootEvents().Any(e => (e as IEventPersistent)?.Id == dataReader.GetUInt64("idRundownEvent")))
                                 continue;
                             var newEvent = _eventRead(engine, dataReader);
                             foundEvents.Add(newEvent);
@@ -1363,13 +1414,13 @@ VALUES
                 {
                     using (var tran = _connection.BeginTransaction())
                     {
-                        if (_connection.ExecuteScript(kvp.Value))
+                        try
                         {
                             var cmdUpdateVersion = new SQLiteCommand($"update `params` set `value` = \"{kvp.Key}\" where `SECTION`=\"DATABASE\" and `key`=\"VERSION\"", _connection);
                             cmdUpdateVersion.ExecuteNonQuery();
                             tran.Commit();
                         }
-                        else
+                        catch
                         {
                             tran.Rollback();
                             return false;
@@ -1581,8 +1632,8 @@ WHERE idServerMedia=@idServerMedia;", _connection);
                 cmd.Parameters.AddWithValue("@typVideo", (byte)media.VideoFormat);
             }
             cmd.Parameters.AddWithValue("@MediaName", media.MediaName);
-            cmd.Parameters.AddWithValue("@Duration", media.Duration);
-            cmd.Parameters.AddWithValue("@DurationPlay", media.DurationPlay);
+            cmd.Parameters.AddWithValue("@Duration", media.Duration.Ticks);
+            cmd.Parameters.AddWithValue("@DurationPlay", media.DurationPlay.Ticks);
             cmd.Parameters.AddWithValue("@Folder", media.Folder);
             cmd.Parameters.AddWithValue("@FileSize", media.FileSize);
             cmd.Parameters.AddWithValue("@FileName", media.FileName);
@@ -1596,8 +1647,8 @@ WHERE idServerMedia=@idServerMedia;", _connection);
             cmd.Parameters.AddWithValue("@AudioVolume", media.AudioVolume);
             cmd.Parameters.AddWithValue("@AudioLevelIntegrated", media.AudioLevelIntegrated);
             cmd.Parameters.AddWithValue("@AudioLevelPeak", media.AudioLevelPeak);
-            cmd.Parameters.AddWithValue("@TCStart", media.TcStart);
-            cmd.Parameters.AddWithValue("@TCPlay", media.TcPlay);
+            cmd.Parameters.AddWithValue("@TCStart", media.TcStart.Ticks);
+            cmd.Parameters.AddWithValue("@TCPlay", media.TcPlay.Ticks);
             try
             {
                 cmd.ExecuteNonQuery();
@@ -1614,7 +1665,7 @@ WHERE idServerMedia=@idServerMedia;", _connection);
                 cmd.Parameters.AddWithValue("@MediaGuid", media.MediaGuid);
                 cmd.Parameters.AddWithValue("@TemplateLayer", media.TemplateLayer);
                 cmd.Parameters.AddWithValue("@Method", (byte)media.Method);
-                cmd.Parameters.AddWithValue("@ScheduledDelay", media.ScheduledDelay);
+                cmd.Parameters.AddWithValue("@ScheduledDelay", media.ScheduledDelay.Ticks);
                 cmd.Parameters.AddWithValue("@StartType", (byte)media.StartType);
                 cmd.Parameters.AddWithValue("@Fields", Newtonsoft.Json.JsonConvert.SerializeObject(media.Fields));
                 cmd.ExecuteNonQuery();

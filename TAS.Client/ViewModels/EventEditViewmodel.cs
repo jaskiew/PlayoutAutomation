@@ -890,8 +890,6 @@ namespace TAS.Client.ViewModels
 
         private string _validateEventName()
         {
-            if (Model.FieldLengths.TryGetValue(nameof(IEvent.EventName), out var length) && EventName.Length > length)
-                return resources._validate_TextTooLong;
             return null;
         }
 

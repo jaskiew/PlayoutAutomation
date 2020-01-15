@@ -341,11 +341,6 @@ namespace TAS.Client.ViewModels
 
         private string _validateMediaName()
         {
-            if (Model is IPersistentMedia pm 
-                && MediaName != null
-                && pm.FieldLengths.TryGetValue(nameof(IMedia.MediaName), out var mnLength) 
-                && MediaName.Length > mnLength)
-                return resources._validate_TextTooLong;
             return null;
         }
 
@@ -364,8 +359,6 @@ namespace TAS.Client.ViewModels
                 return resources._validate_FileAlreadyExists;
             if (!(Model is IPersistentMedia pm))
                 return null;
-            if (pm.FieldLengths.TryGetValue(nameof(IMedia.FileName), out var length) && fileName.Length > length)
-                return resources._validate_TextTooLong;
             if (pm.MediaType == TMediaType.Movie
                 && !FileUtils.VideoFileTypes.Contains(Path.GetExtension(fileName).ToLower()))
                 return string.Format(resources._validate_FileMustHaveExtension, string.Join(resources._or_, FileUtils.VideoFileTypes));
