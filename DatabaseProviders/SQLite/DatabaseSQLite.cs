@@ -7,8 +7,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Serialization;
 using TAS.Common;
 using TAS.Common.Database.Interfaces;
@@ -50,7 +48,7 @@ namespace TAS.Database.SQLite
                 return false;
             lock (_connection)
             {
-                var cmd = new SQLiteCommand("SELECT count(*) FROM archivemedia WHERE idArchive=@idArchive && MediaGuid=@MediaGuid;", _connection);
+                var cmd = new SQLiteCommand("SELECT count(*) FROM archivemedia WHERE idArchive=@idArchive AND MediaGuid=@MediaGuid;", _connection);
                 cmd.Parameters.AddWithValue("@idArchive", dir.IdArchive);
                 cmd.Parameters.AddWithValue("@MediaGuid", mediaGuid);
                 var result = cmd.ExecuteScalar();
@@ -65,7 +63,7 @@ namespace TAS.Database.SQLite
                 return result;
             lock (_connection)
             {
-                var cmd = new SQLiteCommand("SELECT * FROM archivemedia WHERE idArchive=@idArchive && MediaGuid=@MediaGuid;", _connection);
+                var cmd = new SQLiteCommand("SELECT * FROM archivemedia WHERE idArchive=@idArchive AND MediaGuid=@MediaGuid;", _connection);
                 cmd.Parameters.AddWithValue("@idArchive", dir.IdArchive);
                 cmd.Parameters.AddWithValue("@MediaGuid", mediaGuid);
                 using (var dataReader = cmd.ExecuteReader(CommandBehavior.SingleRow))
@@ -490,7 +488,7 @@ VALUES
             lock (_connection)
             {
                 {
-                    var cmd = new SQLiteCommand(@"INSERT INTO archive set Folder=@Folder", _connection);
+                    var cmd = new SQLiteCommand(@"INSERT INTO archive (Folder) VALUES (@Folder)", _connection);
                     cmd.Parameters.AddWithValue("@Folder", dir.Folder);
                     cmd.ExecuteNonQuery();
                     dir.IdArchive = (ulong)_connection.LastInsertRowId;
@@ -968,7 +966,7 @@ VALUES
             var reason = MediaDeleteResult.NoDeny;
             lock (_connection)
             {
-                var cmd = new SQLiteCommand("select * from rundownevent where MediaGuid=@MediaGuid and ADDTIME(ScheduledTime, Duration) > datetime('now', 'localtime');", _connection);
+                var cmd = new SQLiteCommand("select * from rundownevent where MediaGuid=@MediaGuid and (ScheduledTime + Duration) > datetime('now', 'localtime');", _connection);
                 cmd.Parameters.AddWithValue("@MediaGuid", serverMedia.MediaGuid);
                 IEvent futureScheduled = null;
                 using (var reader = cmd.ExecuteReader())
@@ -1556,7 +1554,36 @@ WHERE idRundownEvent=@idRundownEvent;";
 
         public void UpdateMedia(IArchiveMedia archiveMedia, ulong serverId)
         {
-            throw new NotImplementedException();
+            lock (_connection)
+            {
+                var cmd = new SQLiteCommand(@"UPDATE archivemedia SET 
+idArchive=@idArchive, 
+MediaName=@MediaName, 
+Folder=@Folder, 
+FileName=@FileName, 
+FileSize=@FileSize, 
+LastUpdated=@LastUpdated, 
+Duration=@Duration, 
+DurationPlay=@DurationPlay, 
+idProgramme=@idProgramme, 
+statusMedia=@statusMedia, 
+typMedia=@typMedia, 
+typAudio=@typAudio, 
+typVideo=@typVideo, 
+TCStart=@TCStart, 
+TCPlay=@TCPlay, 
+AudioVolume=@AudioVolume, 
+AudioLevelIntegrated=@AudioLevelIntegrated,
+AudioLevelPeak=@AudioLevelPeak,
+idAux=@idAux, 
+KillDate=@KillDate, 
+MediaGuid=@MediaGuid, 
+flags=@flags 
+WHERE idArchiveMedia=@idArchiveMedia;", _connection);
+                cmd.Parameters.AddWithValue("@idArchiveMedia", archiveMedia.IdPersistentMedia);
+                _mediaFillParamsAndExecute(cmd, "archivemedia", archiveMedia, serverId);
+                Debug.WriteLine(archiveMedia, "ArchiveMediaUpdate-d");
+            }
         }
 
         public void UpdateMedia(IServerMedia serverMedia, ulong serverId)

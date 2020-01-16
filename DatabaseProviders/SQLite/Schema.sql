@@ -26,7 +26,7 @@ CREATE TABLE archivemedia (
   TCPlay BIGINT NOT NULL,
   idProgramme BIGINT NOT NULL,
   idAux TEXT,
-  KillDate BIGINT NOT NULL,
+  KillDate BIGINT,
   flags INTEGER NOT NULL
 );
 
@@ -163,7 +163,7 @@ CREATE TABLE servermedia (
   TCPlay BIGINT NOT NULL,
   idProgramme BIGINT NOT NULL,
   idAux TEXT,
-  KillDate BIGINT NOT NULL,
+  KillDate BIGINT,
   flags INTEGER NOT NULL
 );
 
