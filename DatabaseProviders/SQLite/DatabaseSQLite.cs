@@ -738,7 +738,7 @@ VALUES
             lock (_connection)
             {
                 {
-                    var cmd = new SQLiteCommand(@"insert into aco VALUES (typAco=@typAco, Config=@Config);", _connection);
+                    var cmd = new SQLiteCommand(@"insert into aco (typAco, Config) VALUES (@typAco, @Config);", _connection);
                     var serializer = new XmlSerializer(pAco.GetType());
                     using (var writer = new StringWriter())
                     {
