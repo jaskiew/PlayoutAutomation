@@ -259,7 +259,7 @@ VALUES
         {
             lock (_connection)
             {
-                var cmd = new SQLiteCommand("DELETE FROM RundownEvent WHERE idRundownEvent=@idRundownEvent;", _connection);
+                var cmd = new SQLiteCommand("DELETE FROM rundownevent WHERE idRundownEvent=@idRundownEvent;", _connection);
                 cmd.Parameters.AddWithValue("@idRundownEvent", aEvent.Id);
                 cmd.ExecuteNonQuery();
                 Debug.WriteLine("DbDeleteEvent Id={0}, EventName={1}", aEvent.Id, aEvent.EventName);
@@ -305,7 +305,7 @@ VALUES
 
         private bool _deleteServerMedia(IPersistentMedia serverMedia)
         {
-            var cmd = new SQLiteCommand("DELETE FROM ServerMedia WHERE idServerMedia=@idServerMedia;", _connection);
+            var cmd = new SQLiteCommand("DELETE FROM servermedia WHERE idServerMedia=@idServerMedia;", _connection);
             cmd.Parameters.AddWithValue("@idServerMedia", serverMedia.IdPersistentMedia);
             return cmd.ExecuteNonQuery() == 1;
         }
@@ -1136,7 +1136,7 @@ VALUES
             lock (_connection)
             {
                 IEvent result = null;
-                var cmd = new SQLiteCommand("SELECT * FROM RundownEvent where idRundownEvent = @idRundownEvent", _connection);
+                var cmd = new SQLiteCommand("SELECT * FROM rundownevent where idRundownEvent = @idRundownEvent", _connection);
                 cmd.Parameters.AddWithValue("@idRundownEvent", idRundownEvent);
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -1185,7 +1185,7 @@ VALUES
             lock (_connection)
             {
                 IEvent next = null;
-                var cmd = new SQLiteCommand("SELECT * FROM RundownEvent where idEventBinding = @idEventBinding and typStart=@StartType;", _connection);
+                var cmd = new SQLiteCommand("SELECT * FROM rundownevent where idEventBinding = @idEventBinding and typStart=@StartType;", _connection);
                 cmd.Parameters.AddWithValue("@idEventBinding", aEvent.Id);
                 cmd.Parameters.AddWithValue("@StartType", TStartType.After);
                 using (var reader = cmd.ExecuteReader())
@@ -1205,7 +1205,7 @@ VALUES
         {
             lock (_connection)
             {
-                var cmd = new SQLiteCommand("SELECT * FROM RundownEvent where typStart in (@StartTypeManual, @StartTypeOnFixedTime, @StartTypeNone) and idEventBinding=0 and idEngine=@idEngine order by ScheduledTime, EventName", _connection);
+                var cmd = new SQLiteCommand("SELECT * FROM rundownevent where typStart in (@StartTypeManual, @StartTypeOnFixedTime, @StartTypeNone) and idEventBinding=0 and idEngine=@idEngine order by ScheduledTime, EventName", _connection);
                 cmd.Parameters.AddWithValue("@idEngine", ((IPersistent)engine).Id);
                 cmd.Parameters.AddWithValue("@StartTypeManual", (byte)TStartType.Manual);
                 cmd.Parameters.AddWithValue("@StartTypeOnFixedTime", (byte)TStartType.OnFixedTime);
@@ -1229,7 +1229,7 @@ VALUES
                 return null;
             lock (_connection)
             {
-                var cmd = new SQLiteCommand("SELECT * FROM RundownEvent WHERE idEventBinding = @idEventBinding AND (typStart=@StartTypeManual OR typStart=@StartTypeOnFixedTime);", _connection);
+                var cmd = new SQLiteCommand("SELECT * FROM rundownevent WHERE idEventBinding = @idEventBinding AND (typStart=@StartTypeManual OR typStart=@StartTypeOnFixedTime);", _connection);
                 if (eventOwner.EventType == TEventType.Container)
                 {
                     cmd.Parameters.AddWithValue("@StartTypeManual", TStartType.Manual);
@@ -1237,7 +1237,7 @@ VALUES
                 }
                 else
                 {
-                    cmd = new SQLiteCommand("SELECT * FROM RundownEvent where idEventBinding = @idEventBinding and typStart in (@StartTypeWithParent, @StartTypeWithParentFromEnd);", _connection);
+                    cmd = new SQLiteCommand("SELECT * FROM rundownevent where idEventBinding = @idEventBinding and typStart in (@StartTypeWithParent, @StartTypeWithParentFromEnd);", _connection);
                     cmd.Parameters.AddWithValue("@StartTypeWithParent", TStartType.WithParent);
                     cmd.Parameters.AddWithValue("@StartTypeWithParentFromEnd", TStartType.WithParentFromEnd);
                 }
