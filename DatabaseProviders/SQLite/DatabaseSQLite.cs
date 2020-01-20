@@ -1594,7 +1594,7 @@ WHERE idArchiveMedia=@idArchiveMedia;", _connection);
 
         private void _dbUpdateMedia(IPersistentMedia serverMedia, ulong serverId)
         {
-            var cmd = new SQLiteCommand(@"UPDATE ServerMedia SET 
+            var cmd = new SQLiteCommand(@"UPDATE servermedia SET 
 idServer=@idServer, 
 MediaName=@MediaName, 
 Folder=@Folder, 
