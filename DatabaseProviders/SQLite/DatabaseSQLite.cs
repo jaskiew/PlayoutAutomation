@@ -418,7 +418,6 @@ VALUES
 
         private T _readArchiveMedia<T>(SQLiteDataReader dataReader) where T : IArchiveMedia, new()
         {
-            dataReader.Close();
             var media = new T
             {
                 IdPersistentMedia = dataReader.GetUInt64("idArchiveMedia")
